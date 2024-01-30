@@ -13,6 +13,7 @@
 #ifndef DIAGMEM_H
 #define DIAGMEM_H
 #include "diagchar.h"
+extern mempool_t *diag_pools_array[NUM_MEMORY_POOLS];
 
 void *diagmem_alloc(struct diagchar_dev *driver, int size, int pool_type);
 void diagmem_free(struct diagchar_dev *driver, void *buf, int pool_type);

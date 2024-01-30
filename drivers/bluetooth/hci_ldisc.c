@@ -51,7 +51,6 @@
 static bool reset = 0;
 
 static struct hci_uart_proto *hup[HCI_UART_MAX_PROTO];
-static void hci_uart_tty_wakeup_action(unsigned long data);
 
 int hci_uart_register_proto(struct hci_uart_proto *p)
 {
@@ -232,14 +231,6 @@ static int hci_uart_send_frame(struct sk_buff *skb)
 	return 0;
 }
 
-static void hci_uart_destruct(struct hci_dev *hdev)
-{
-	if (!hdev)
-		return;
-
-	BT_DBG("%s", hdev->name);
-	kfree(hdev->driver_data);
-}
 
 /* ------ LDISC part ------ */
 /* hci_uart_tty_open
@@ -253,14 +244,9 @@ static void hci_uart_destruct(struct hci_dev *hdev)
  */
 static int hci_uart_tty_open(struct tty_struct *tty)
 {
-	struct hci_uart *hu = (void *) tty->disc_data;
+	struct hci_uart *hu;
 
 	BT_DBG("tty %p", tty);
-
-	/* FIXME: This btw is bogus, nothing requires the old ldisc to clear
-	   the pointer */
-	if (hu)
-		return -EEXIST;
 
 	/* Error if the tty has no write op instead of leaving an exploitable
 	   hole */
@@ -277,8 +263,6 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 	tty->receive_room = 65536;
 
 	spin_lock_init(&hu->rx_lock);
-	tasklet_init(&hu->tty_wakeup_task, hci_uart_tty_wakeup_action,
-			 (unsigned long)hu);
 
 	/* Flush any pending characters in the driver and line discipline. */
 
@@ -300,36 +284,36 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 static void hci_uart_tty_close(struct tty_struct *tty)
 {
 	struct hci_uart *hu = (void *)tty->disc_data;
+	struct hci_dev *hdev;
 
 	BT_DBG("tty %p", tty);
 
 	/* Detach from the tty */
 	tty->disc_data = NULL;
 
-	if (hu) {
-		struct hci_dev *hdev = hu->hdev;
+	if (!hu)
+		return;
 
-		if (hdev)
-			hci_uart_close(hdev);
+	hdev = hu->hdev;
+	if (hdev)
+		hci_uart_close(hdev);
 
-		tasklet_kill(&hu->tty_wakeup_task);
-
-		if (test_and_clear_bit(HCI_UART_PROTO_SET, &hu->flags)) {
-			hu->proto->close(hu);
-			if (hdev) {
-				hci_unregister_dev(hdev);
-				hci_free_dev(hdev);
-			}
+	if (test_and_clear_bit(HCI_UART_PROTO_SET, &hu->flags)) {
+		if (hdev) {
+			hci_unregister_dev(hdev);
+			cancel_work_sync(&hu->write_work);
+			hci_free_dev(hdev);
 		}
+		hu->proto->close(hu);
 	}
+
+	kfree(hu);
 }
 
 /* hci_uart_tty_wakeup()
  *
  *    Callback for transmit wakeup. Called when low level
  *    device driver can accept more send data.
- *    This callback gets called from the isr context so
- *    schedule the send data operation to tasklet.
  *
  * Arguments:        tty    pointer to associated tty instance data
  * Return Value:    None
@@ -337,25 +321,11 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 static void hci_uart_tty_wakeup(struct tty_struct *tty)
 {
 	struct hci_uart *hu = (void *)tty->disc_data;
-	tasklet_schedule(&hu->tty_wakeup_task);
-}
-
-/* hci_uart_tty_wakeup_action()
- *
- * Scheduled action to transmit data when low level device
- * driver can accept more data.
- */
-static void hci_uart_tty_wakeup_action(unsigned long data)
-{
-	struct hci_uart *hu = (struct hci_uart *)data;
-	struct tty_struct *tty;
 
 	BT_DBG("");
 
 	if (!hu)
 		return;
-
-	tty = hu->tty;
 
 	clear_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
 
@@ -383,10 +353,13 @@ static void hci_uart_tty_receive(struct tty_struct *tty, const u8 *data, char *f
 	int ret;
 	struct hci_uart *hu = (void *)tty->disc_data;
 
-	if (!hu || tty != hu->tty)
+	if (!hu || tty != hu->tty || !data)
 		return;
 
 	if (!test_bit(HCI_UART_PROTO_SET, &hu->flags))
+		return;
+
+	if (!hu->proto)
 		return;
 
 	spin_lock(&hu->rx_lock);
@@ -420,7 +393,6 @@ static int hci_uart_register_dev(struct hci_uart *hu)
 	hdev->close = hci_uart_close;
 	hdev->flush = hci_uart_flush;
 	hdev->send  = hci_uart_send_frame;
-	hdev->destruct = hci_uart_destruct;
 	hdev->parent = hu->tty->dev;
 
 	hdev->owner = THIS_MODULE;
