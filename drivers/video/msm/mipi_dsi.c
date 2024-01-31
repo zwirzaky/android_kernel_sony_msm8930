@@ -450,7 +450,7 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 		if (mipi_dsi_clk_init(pdev))
 			return -EPERM;
 
-		if (mipi_dsi_pdata->splash_is_enabled &&
+		if (mipi_dsi_pdata && mipi_dsi_pdata->splash_is_enabled &&
 			!mipi_dsi_pdata->splash_is_enabled()) {
 			mipi_dsi_prepare_ahb_clocks();
 			mipi_dsi_ahb_ctrl(1);

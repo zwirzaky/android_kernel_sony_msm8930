@@ -26,6 +26,13 @@
 	get_user(val, srcptr) || put_user(val, dstptr);	\
 })
 
+#define convert_in_user(srcptr, dstptr)			\
+({							\
+	typeof(*srcptr) val;				\
+							\
+	get_user(val, srcptr) || put_user(val, dstptr);	\
+})
+
 static long native_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long ret = -ENOIOCTLCMD;

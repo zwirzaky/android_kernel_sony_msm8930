@@ -287,7 +287,7 @@ failure:
        {
            if(VOS_TRUE != tx_timer_running(&pMac->lim.limTimers.gLimHeartBeatTimer))
            {
-               PELOGE(pmmLog(pMac, LOGE, FL("Unexpected heartbeat timer not running"));)
+               PELOGE(pmmLog(pMac, LOGW, FL("Unexpected heartbeat timer not running"));)
                limReactivateHeartBeatTimer(pMac, psessionEntry);
            }
        }
@@ -478,7 +478,7 @@ void pmmInitBmpsPwrSave(tpAniSirGlobal pMac)
        {
            if(VOS_TRUE != tx_timer_running(&pMac->lim.limTimers.gLimHeartBeatTimer))
            {
-               PELOGE(pmmLog(pMac, LOGE, FL("Unexpected heartbeat timer not running"));)
+               PELOGE(pmmLog(pMac, LOGW, FL("Unexpected heartbeat timer not running"));)
                limReactivateHeartBeatTimer(pMac, psessionEntry);
            }
        }

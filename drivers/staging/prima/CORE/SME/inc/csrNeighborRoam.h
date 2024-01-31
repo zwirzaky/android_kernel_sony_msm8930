@@ -166,7 +166,7 @@ typedef struct sCsrNeighborRoamControlInfo
     tCsrNeighborRoamChannelInfo roamChannelInfo;
     tANI_U8                     currentNeighborLookupThreshold;
     tANI_BOOLEAN                scanRspPending;
-    tANI_TIMESTAMP              scanRequestTimeStamp;
+    v_TIME_t                    scanRequestTimeStamp;
     tDblLinkList                roamableAPList;    // List of current FT candidates
     tANI_U32                    csrSessionId;
     tCsrRoamProfile             csrNeighborRoamProfile;

@@ -1196,6 +1196,13 @@ void hdd_suspend_wlan(void)
       return;
    }
 
+   if (pHddCtx->hdd_wlan_suspended)
+   {
+      hddLog(VOS_TRACE_LEVEL_ERROR,
+             "%s: Ignore suspend wlan, Already suspended!", __func__);
+      return;
+   }
+
    hdd_set_pwrparams(pHddCtx);
    status =  hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
    while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
@@ -1464,6 +1471,8 @@ void hdd_resume_wlan(void)
    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
    VOS_STATUS status;
    v_CONTEXT_t pVosContext = NULL;
+   tPmcState pmc_state;
+   hdd_adapter_t *first_adapter = NULL;
 
    hddLog(VOS_TRACE_LEVEL_INFO, "%s: WLAN being resumed by Android OS",__func__);
 
@@ -1488,7 +1497,33 @@ void hdd_resume_wlan(void)
       return;
    }
 
+   if (!pHddCtx->hdd_wlan_suspended)
+   {
+      hddLog(VOS_TRACE_LEVEL_ERROR,
+             "%s: Ignore resume wlan, Already resumed!", __func__);
+      return;
+   }
+
    pHddCtx->hdd_wlan_suspended = FALSE;
+
+      /* Get first valid adapter for disable/enable  bmps purpose */
+   status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
+   while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
+   {
+       first_adapter = pAdapterNode->pAdapter;
+       if (first_adapter != NULL)
+           break;
+       status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
+       pAdapterNode = pNext;
+   }
+   pmc_state = pmcGetPmcState(pHddCtx->hHal);
+   if (BMPS == pmc_state && first_adapter)
+   {
+       /* put the device into full power */
+       hddLog(VOS_TRACE_LEVEL_INFO,
+             "%s: Disaling bmps during resume", __func__);
+       wlan_hdd_enter_bmps(first_adapter, DRIVER_POWER_MODE_ACTIVE);
+   }
    /*loop through all adapters. Concurrency */
    status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
 
@@ -1535,14 +1570,8 @@ void hdd_resume_wlan(void)
                         "Switch to DTIM%d \n",powerRequest.uListenInterval);
          sme_SetPowerParams( WLAN_HDD_GET_HAL_CTX(pAdapter), &powerRequest, FALSE);
 
-         if (BMPS == pmcGetPmcState(pHddCtx->hHal))
+         if (BMPS == pmc_state)
          {
-             /* put the device into full power */
-             wlan_hdd_enter_bmps(pAdapter, DRIVER_POWER_MODE_ACTIVE);
-
-             /* put the device back into BMPS */
-             wlan_hdd_enter_bmps(pAdapter, DRIVER_POWER_MODE_AUTO);
-
              pHddCtx->hdd_ignore_dtim_enabled = FALSE;
          }
       }
@@ -1550,6 +1579,15 @@ void hdd_resume_wlan(void)
       hdd_conf_resume_ind(pAdapter);
       status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
       pAdapterNode = pNext;
+   }
+
+   if (BMPS == pmc_state && first_adapter)
+   {
+       /* put the device into full power */
+       hddLog(VOS_TRACE_LEVEL_INFO,
+             "%s: Enable bmps during resume", __func__);
+      /* put the device back into BMPS */
+      wlan_hdd_enter_bmps(first_adapter, DRIVER_POWER_MODE_AUTO);
    }
 
 #ifdef SUPPORT_EARLY_SUSPEND_STANDBY_DEEPSLEEP   
@@ -1709,22 +1747,22 @@ VOS_STATUS hdd_wlan_shutdown(void)
     */
    /* Wait for MC to exit */
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Shutting down MC thread",__func__);
-   set_bit(MC_SHUTDOWN_EVENT_MASK, &vosSchedContext->mcEventFlag);
-   set_bit(MC_POST_EVENT_MASK, &vosSchedContext->mcEventFlag);
+   set_bit(MC_SHUTDOWN_EVENT, &vosSchedContext->mcEventFlag);
+   set_bit(MC_POST_EVENT, &vosSchedContext->mcEventFlag);
    wake_up_interruptible(&vosSchedContext->mcWaitQueue);
    wait_for_completion(&vosSchedContext->McShutdown);
 
    /* Wait for TX to exit */
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Shutting down TX thread",__func__);
-   set_bit(TX_SHUTDOWN_EVENT_MASK, &vosSchedContext->txEventFlag);
-   set_bit(TX_POST_EVENT_MASK, &vosSchedContext->txEventFlag);
+   set_bit(TX_SHUTDOWN_EVENT, &vosSchedContext->txEventFlag);
+   set_bit(TX_POST_EVENT, &vosSchedContext->txEventFlag);
    wake_up_interruptible(&vosSchedContext->txWaitQueue);
    wait_for_completion(&vosSchedContext->TxShutdown);
 
    /* Wait for RX to exit */
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Shutting down RX thread",__func__);
-   set_bit(RX_SHUTDOWN_EVENT_MASK, &vosSchedContext->rxEventFlag);
-   set_bit(RX_POST_EVENT_MASK, &vosSchedContext->rxEventFlag);
+   set_bit(RX_SHUTDOWN_EVENT, &vosSchedContext->rxEventFlag);
+   set_bit(RX_POST_EVENT, &vosSchedContext->rxEventFlag);
    wake_up_interruptible(&vosSchedContext->rxWaitQueue);
    wait_for_completion(&vosSchedContext->RxShutdown);
 

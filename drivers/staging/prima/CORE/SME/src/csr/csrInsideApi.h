@@ -65,6 +65,7 @@
 #define CSR_MAX_2_4_GHZ_SUPPORTED_CHANNELS 14
 
 #define CSR_MAX_BSS_SUPPORT            250
+#define SYSTEM_TIME_SEC_TO_MSEC       1000
 
 //This number minus 1 means the number of times a channel is scanned before a BSS is remvoed from
 //cache scan result
@@ -475,6 +476,9 @@ eHalStatus csrScanFlushResult(tpAniSirGlobal);
 eHalStatus csrScanFilterResults(tpAniSirGlobal pMac);
 
 eHalStatus csrScanFlushSelectiveResult(tpAniSirGlobal, v_BOOL_t flushP2P);
+
+eHalStatus csrScanFlushSelectiveSsid(tpAniSirGlobal pMac, tANI_U8 *ssId,
+                                     tANI_U8 ssIdLen);
 /* ---------------------------------------------------------------------------
     \fn csrScanBGScanGetParam
     \brief Returns the current background scan settings.

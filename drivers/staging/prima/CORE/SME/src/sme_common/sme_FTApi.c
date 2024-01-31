@@ -389,8 +389,8 @@ eHalStatus sme_FTUpdateKey( tHalHandle hHal, tCsrRoamSetKey * pFTKeyInfo )
        break;
           
     default:
-       smsLog( pMac, LOGE, "%s: Unhandled state=%d", __func__,
-               pMac->ft.ftSmeContext.FTState);
+        smsLog(pMac, LOG1, FL("Unhandled state=%d"),
+                              pMac->ft.ftSmeContext.FTState);
        status = eHAL_STATUS_FAILURE;
        break;
     }
