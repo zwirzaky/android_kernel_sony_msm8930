@@ -26,7 +26,7 @@
  *          0: tell VFS to invalidate dentry
  *          1: dentry is valid
  */
-static int sdcardfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
+static int sdcardfs_d_revalidate(struct dentry *dentry, unsigned int flags)
 {
 	int err = 1;
 	struct path parent_lower_path, lower_path;
@@ -37,7 +37,7 @@ static int sdcardfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 	struct inode *inode;
 	struct sdcardfs_inode_data *data;
 
-	if (nd && nd->flags & LOOKUP_RCU)
+	if (flags & LOOKUP_RCU)
 		return -ECHILD;
 
 	spin_lock(&dentry->d_lock);
@@ -63,7 +63,7 @@ static int sdcardfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 	lower_cur_parent_dentry = dget_parent(lower_dentry);
 
 	if ((lower_dentry->d_flags & DCACHE_OP_REVALIDATE)) {
-		err = lower_dentry->d_op->d_revalidate(lower_dentry, nd);
+		err = lower_dentry->d_op->d_revalidate(lower_dentry, flags);
 		if (err == 0) {
 			d_drop(dentry);
 			goto out;
@@ -129,6 +129,12 @@ out:
 	return err;
 }
 
+/* 1 = delete, 0 = cache */
+static int sdcardfs_d_delete(const struct dentry *d)
+{
+	return SDCARDFS_SB(d->d_sb)->options.nocache ? 1 : 0;
+}
+
 static void sdcardfs_d_release(struct dentry *dentry)
 {
 	/* release and reset the lower paths */
@@ -187,6 +193,7 @@ static void sdcardfs_canonical_path(const struct path *path,
 
 const struct dentry_operations sdcardfs_ci_dops = {
 	.d_revalidate	= sdcardfs_d_revalidate,
+	.d_delete	= sdcardfs_d_delete,
 	.d_release	= sdcardfs_d_release,
 	.d_hash	= sdcardfs_hash_ci,
 	.d_compare	= sdcardfs_cmp_ci,
