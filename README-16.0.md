@@ -9,17 +9,13 @@ bring-up:
   `CONFIG_PRIMA_WLAN=y`, `CONFIG_WCNSS_CORE=y`, `CONFIG_SDCARD_FS=y`,
   SELinux/AUDIT/namespaces.
 
-It boots Android 9, WiFi and Bluetooth work, and sleep/wake works after the
-device-tree sensor fix.
+It boots Android 9, WiFi and Bluetooth work, sleep/wake works after the
+device-tree sensor fix, and **USB ADB/MTP work through functionfs**
+(`android.c` includes `f_fs.c`, the `ffs` function is aliased to `adb`,
+and the device tree mounts functionfs).
 
 ## TODO
 
-- **USB ADB/MTP**: the kernel has the legacy `f_adb` function
-  (`CONFIG_USB_G_ANDROID=y`, no `CONFIG_USB_FUNCTIONFS`). Android 9 `adbd`
-  uses functionfs, so enabling USB debugging disables the gadget. Port the
-  `ffs` glue from the Sony msm8960t `lineage-16.0` kernel
-  (`drivers/usb/gadget/android.c`), enable `CONFIG_USB_FUNCTIONFS`, and mount
-  functionfs in the device tree init.
 - deep-sleep/wakeup auditing,
 - RIL/camera kernel side if needed.
 
