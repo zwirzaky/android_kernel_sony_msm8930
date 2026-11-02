@@ -712,3 +712,6 @@ CONFIG_TASK_DELAY_ACCT=y
 CONFIG_TASK_XACCT=y
 CONFIG_TASK_IO_ACCOUNTING=y
 
+
+# Disable legacy earlysuspend; Android 9/libsuspend uses pm_suspend/resume.
+# CONFIG_EARLYSUSPEND is not set
